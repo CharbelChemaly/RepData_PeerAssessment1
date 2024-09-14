@@ -1,0 +1,138 @@
+# Reproducible Data - Project 1
+
+```{r}
+library(readr)
+library(readr)
+activity <- read_csv("C:/Users/Charb/OneDrive/Desktop/R training/Reproducible_Research/repdata_data_activity/activity.csv")
+```
+
+## What is the mean total number of steps taken per day?
+
+1. I calculate the total number of steps taken per day: 
+
+```{r results='hide'}
+library(plyr)
+library(dplyr)
+steps_per_day <- activity %>% 
+  group_by(date) %>% 
+  summarise(total = sum(steps, na.rm = TRUE)) 
+```
+
+2. I create a histogram of the distribution of the number of steps taken
+
+```{r}
+hist(steps_per_day$total, breaks = 20, xlab = "Steps per day", main = 
+       "Distribution of number of steps taken per day")
+```
+
+This shows the frequency of a certain number of steps for a day. For example, 0 steps were taken in 10 % of days.
+
+3. I get the mean and the median of the total number of steps per day. 
+
+```{r}
+mean_per_day <- activity %>% 
+  group_by(date) %>% 
+  summarise(total = mean(steps, na.rm = TRUE)) 
+
+plot(mean_per_day$date, mean_per_day$total, ylab="Mean number of steps",
+     xlab="Date", main = "Mean number of steps per Day")
+```
+
+```{r}
+median_per_day <- activity %>% 
+  group_by(date) %>% 
+  summarise(total = median(steps, na.rm = TRUE))  
+```
+
+## What is the average daily activity pattern?
+
+1. I make a time plot divided by the 5 minute intervals 
+
+```{r, fig.height=5, fig.width=6}
+mean_per_interval <- activity %>% 
+  group_by(interval) %>% 
+  summarise(total = mean(steps, na.rm = TRUE)) 
+ 
+plot(mean_per_interval$interval, mean_per_interval$total, type ="l",
+     xlab="Interval", ylab="Step Average", main = "Steps taken by 5 min interval")
+```
+
+2. The interval that has the highest number of steps is :
+
+```{r}
+max_per_interval <- activity %>% 
+  group_by(interval) %>% 
+  summarise(total = sum(steps, na.rm = TRUE)) %>% 
+  summarise (max = interval[which.max(total)]) 
+max_per_interval[[1,1]]
+```
+The interval number 835 contains the most total number of steps taken
+
+## Imputing missing values
+
+1. The total number of NAs in the data set is:
+
+```{r}
+sum(is.na(activity$steps))
+```
+2. A strategy to get rid of the missing data. I'll use the mean by interval
+
+```{r}
+activity_filled <- activity %>%
+  left_join(mean_per_interval, by = "interval") %>%    
+  mutate(steps = ifelse(is.na(steps), total, steps)) %>%  
+  select(-total)   
+```  
+
+3. I calculate the new mean and median
+
+```{r}
+new_mean_per_day <- activity_filled %>% 
+  group_by(date) %>% 
+  summarise(total = mean(steps, na.rm = TRUE)) 
+
+plot(new_mean_per_day$date, new_mean_per_day$total, ylab="Mean number of steps",
+     xlab="Date", main = "New mean number of steps per Day")
+points(mean_per_day$date, mean_per_day$total, pch = 19)
+```
+There was not a big change for the mean. Only the points in white are those that changed
+
+```{r}
+new_median_per_day <- activity_filled %>% 
+  group_by(date) %>% 
+  summarise(total = median(steps, na.rm = TRUE))  
+```
+
+## Are there differences in activity patterns between weekdays and weekends?
+
+1. Creating the factor "weekdays" and "weekends"
+
+```{r}
+activity_filled <- activity_filled %>% 
+  mutate(Day = weekdays(date)) %>% 
+  mutate(Day = if_else(Day %in% c("Saturday", "Sunday"), "Weekend", "Weekday"))
+```
+
+2. Making a plot containing the average steps taken on weekdays vs weekends
+
+```{r fig.align='center'}
+mean_week_day <- activity_filled %>% 
+  group_by(Day, interval) %>% 
+  summarise(steps = mean(steps), .groups = "keep")
+
+library(ggplot2)
+library(patchwork)
+p1 <- ggplot(mean_week_day[mean_week_day$Day == "Weekday", ], aes(x = interval, y = steps)) +
+  geom_line() +
+  labs(x = "Interval", y = "Step Average", 
+       title = "Steps taken by 5 min interval on weekdays")
+
+# Plot for Weekends
+p2 <- ggplot(mean_week_day[mean_week_day$Day == "Weekend", ], aes(x = interval, y = steps)) +
+  geom_line() +
+  labs(x = "Interval", y = "Step Average", 
+       title = "Steps taken by 5 min interval on weekends")
+
+p1 + p2 + plot_layout(ncol = 2)
+
+```
